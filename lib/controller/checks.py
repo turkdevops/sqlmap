@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Copyright (c) 2006-2023 sqlmap developers (https://sqlmap.org/)
+Copyright (c) 2006-2025 sqlmap developers (https://sqlmap.org/)
 See the file 'LICENSE' for copying permission
 """
 
@@ -217,6 +217,7 @@ def checkSqlInjection(place, parameter, value):
                         if _ > 1:
                             __ = 2 * (_ - 1) + 1 if _ == lower else 2 * _
                             unionExtended = True
+                            test.request._columns = test.request.columns
                             test.request.columns = re.sub(r"\b%d\b" % _, str(__), test.request.columns)
                             title = re.sub(r"\b%d\b" % _, str(__), title)
                             test.title = re.sub(r"\b%d\b" % _, str(__), test.title)
@@ -580,7 +581,7 @@ def checkSqlInjection(place, parameter, value):
 
                             if injectable:
                                 if kb.pageStable and not any((conf.string, conf.notString, conf.regexp, conf.code, kb.nullConnection)):
-                                    if all((falseCode, trueCode)) and falseCode != trueCode:
+                                    if all((falseCode, trueCode)) and falseCode != trueCode and trueCode != kb.heuristicCode:
                                         suggestion = conf.code = trueCode
 
                                         infoMsg = "%sparameter '%s' appears to be '%s' injectable (with --code=%d)" % ("%s " % paramType if paramType != parameter else "", parameter, title, conf.code)
@@ -819,6 +820,9 @@ def checkSqlInjection(place, parameter, value):
                     choice = readInput(msg, default=str(conf.verbose), checkBatch=False)
                 conf.verbose = int(choice)
                 setVerbosity()
+                if hasattr(test.request, "columns") and hasattr(test.request, "_columns"):
+                    test.request.columns = test.request._columns
+                    delattr(test.request, "_columns")
                 tests.insert(0, test)
             elif choice == 'N':
                 return None
@@ -1046,9 +1050,10 @@ def heuristicCheckSqlInjection(place, parameter):
 
     payload = "%s%s%s" % (prefix, randStr, suffix)
     payload = agent.payload(place, parameter, newValue=payload)
-    page, _, _ = Request.queryPage(payload, place, content=True, raise404=False)
+    page, _, code = Request.queryPage(payload, place, content=True, raise404=False)
 
     kb.heuristicPage = page
+    kb.heuristicCode = code
     kb.heuristicMode = False
 
     parseFilePaths(page)

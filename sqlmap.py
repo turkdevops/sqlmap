@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Copyright (c) 2006-2023 sqlmap developers (https://sqlmap.org/)
+Copyright (c) 2006-2025 sqlmap developers (https://sqlmap.org/)
 See the file 'LICENSE' for copying permission
 """
 
@@ -50,8 +50,8 @@ try:
     from lib.core.data import logger
 
     from lib.core.common import banner
-    from lib.core.common import checkIntegrity
     from lib.core.common import checkPipedInput
+    from lib.core.common import checkSums
     from lib.core.common import createGithubIssue
     from lib.core.common import dataToStdout
     from lib.core.common import extractRegexResult
@@ -64,7 +64,6 @@ try:
     from lib.core.common import setPaths
     from lib.core.common import weAreFrozen
     from lib.core.convert import getUnicode
-    from lib.core.common import MKSTEMP_PREFIX
     from lib.core.common import setColor
     from lib.core.common import unhandledExceptionMessage
     from lib.core.compat import LooseVersion
@@ -73,6 +72,7 @@ try:
     from lib.core.data import conf
     from lib.core.data import kb
     from lib.core.datatype import OrderedSet
+    from lib.core.enums import MKSTEMP_PREFIX
     from lib.core.exception import SqlmapBaseException
     from lib.core.exception import SqlmapShellQuitException
     from lib.core.exception import SqlmapSilentQuitException
@@ -268,7 +268,7 @@ def main():
         print()
         errMsg = unhandledExceptionMessage()
         excMsg = traceback.format_exc()
-        valid = checkIntegrity()
+        valid = checkSums()
 
         os._exitcode = 255
 
@@ -436,6 +436,11 @@ def main():
             logger.critical(errMsg)
             raise SystemExit
 
+        elif any(_ in errMsg for _ in (": 9.9.9#",)):
+            errMsg = "LOL xD"
+            logger.critical(errMsg)
+            raise SystemExit
+
         elif kb.get("dumpKeyboardInterrupt"):
             raise SystemExit
 
@@ -443,7 +448,7 @@ def main():
             raise SystemExit
 
         elif valid is False:
-            errMsg = "code integrity check failed (turning off automatic issue creation). "
+            errMsg = "code checksum failed (turning off automatic issue creation). "
             errMsg += "You should retrieve the latest development version from official GitHub "
             errMsg += "repository at '%s'" % GIT_PAGE
             logger.critical(errMsg)
@@ -457,12 +462,17 @@ def main():
             dataToStdout(excMsg)
             raise SystemExit
 
-        elif any(_ in excMsg for _ in ("ImportError", "ModuleNotFoundError", "<frozen", "Can't find file for module", "SAXReaderNotAvailable", "source code string cannot contain null bytes", "No module named", "tp_name field", "module 'sqlite3' has no attribute 'OperationalError'")):
+        elif any(_ in excMsg for _ in ("ImportError", "ModuleNotFoundError", "<frozen", "Can't find file for module", "SAXReaderNotAvailable", "<built-in function compile> returned NULL without setting an exception", "source code string cannot contain null bytes", "No module named", "tp_name field", "module 'sqlite3' has no attribute 'OperationalError'")):
             errMsg = "invalid runtime environment ('%s')" % excMsg.split("Error: ")[-1].strip()
             logger.critical(errMsg)
             raise SystemExit
 
         elif all(_ in excMsg for _ in ("SyntaxError: Non-ASCII character", ".py on line", "but no encoding declared")):
+            errMsg = "invalid runtime environment ('%s')" % excMsg.split("Error: ")[-1].strip()
+            logger.critical(errMsg)
+            raise SystemExit
+
+        elif all(_ in excMsg for _ in ("FileNotFoundError: [Errno 2] No such file or directory", "cwd = os.getcwd()")):
             errMsg = "invalid runtime environment ('%s')" % excMsg.split("Error: ")[-1].strip()
             logger.critical(errMsg)
             raise SystemExit
@@ -543,7 +553,7 @@ def main():
     finally:
         kb.threadContinue = False
 
-        if getDaysFromLastUpdate() > LAST_UPDATE_NAGGING_DAYS:
+        if (getDaysFromLastUpdate() or 0) > LAST_UPDATE_NAGGING_DAYS:
             warnMsg = "your sqlmap version is outdated"
             logger.warning(warnMsg)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Copyright (c) 2006-2023 sqlmap developers (https://sqlmap.org/)
+Copyright (c) 2006-2025 sqlmap developers (https://sqlmap.org/)
 See the file 'LICENSE' for copying permission
 """
 
@@ -201,8 +201,11 @@ def cmdLineParser(argv=None):
         request.add_argument("--auth-file", dest="authFile",
             help="HTTP authentication PEM cert/private key file")
 
+        request.add_argument("--abort-code", dest="abortCode",
+            help="Abort on (problematic) HTTP error code(s) (e.g. 401)")
+
         request.add_argument("--ignore-code", dest="ignoreCode",
-            help="Ignore (problematic) HTTP error code (e.g. 401)")
+            help="Ignore (problematic) HTTP error code(s) (e.g. 401)")
 
         request.add_argument("--ignore-proxy", dest="ignoreProxy", action="store_true",
             help="Ignore system default proxy settings")
@@ -410,6 +413,9 @@ def cmdLineParser(argv=None):
 
         techniques.add_argument("--union-from", dest="uFrom",
             help="Table to use in FROM part of UNION query SQL injection")
+
+        techniques.add_argument("--union-values", dest="uValues",
+            help="Column values to use for UNION query SQL injection")
 
         techniques.add_argument("--dns-domain", dest="dnsDomain",
             help="Domain name used for DNS exfiltration attack")
@@ -628,6 +634,9 @@ def cmdLineParser(argv=None):
         general.add_argument("-t", dest="trafficFile",
             help="Log all HTTP traffic into a textual file")
 
+        general.add_argument("--abort-on-empty", dest="abortOnEmpty", action="store_true",
+            help="Abort data retrieval on empty results")
+
         general.add_argument("--answers", dest="answers",
             help="Set predefined answers (e.g. \"quit=N,follow=N\")")
 
@@ -727,6 +736,12 @@ def cmdLineParser(argv=None):
         general.add_argument("--test-skip", dest="testSkip",
             help="Skip tests by payloads and/or titles (e.g. BENCHMARK)")
 
+        general.add_argument("--time-limit", dest="timeLimit", type=float,
+            help="Run with a time limit in seconds (e.g. 3600)")
+
+        general.add_argument("--unsafe-naming", dest="unsafeNaming", action="store_true",
+            help="Disable escaping of DBMS identifiers (e.g. \"user\")")
+
         general.add_argument("--web-root", dest="webRoot",
             help="Web server document root directory (e.g. \"/var/www\")")
 
@@ -747,6 +762,9 @@ def cmdLineParser(argv=None):
 
         miscellaneous.add_argument("--disable-coloring", dest="disableColoring", action="store_true",
             help="Disable console output coloring")
+
+        miscellaneous.add_argument("--disable-hashing", dest="disableHashing", action="store_true",
+            help="Disable hash analysis on table dumps")
 
         miscellaneous.add_argument("--list-tampers", dest="listTampers", action="store_true",
             help="Display list of available tamper scripts")
@@ -995,6 +1013,9 @@ def cmdLineParser(argv=None):
                 argv[i] = argv[i].replace("--auth-creds", "--auth-cred", 1)
             elif argv[i].startswith("--drop-cookie"):
                 argv[i] = argv[i].replace("--drop-cookie", "--drop-set-cookie", 1)
+            elif re.search(r"\A--tamper[^=\s]", argv[i]):
+                argv[i] = ""
+                continue
             elif re.search(r"\A(--(tamper|ignore-code|skip))(?!-)", argv[i]):
                 key = re.search(r"\-?\-(\w+)\b", argv[i]).group(1)
                 index = auxIndexes.get(key, None)
