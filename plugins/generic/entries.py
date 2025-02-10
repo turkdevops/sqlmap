@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Copyright (c) 2006-2023 sqlmap developers (https://sqlmap.org/)
+Copyright (c) 2006-2025 sqlmap developers (https://sqlmap.org/)
 See the file 'LICENSE' for copying permission
 """
 
@@ -115,7 +115,7 @@ class Entries(object):
             if kb.dumpKeyboardInterrupt:
                 break
 
-            if conf.exclude and re.search(conf.exclude, tbl, re.I) is not None:
+            if conf.exclude and re.search(conf.exclude, unsafeSQLIdentificatorNaming(tbl), re.I) is not None:
                 infoMsg = "skipping table '%s'" % unsafeSQLIdentificatorNaming(tbl)
                 singleTimeLogMessage(infoMsg)
                 continue
@@ -134,12 +134,14 @@ class Entries(object):
                     kb.dumpTable = "%s:%s" % (conf.db, tbl)
                 elif Backend.isDbms(DBMS.SQLITE):
                     kb.dumpTable = tbl
+                elif METADB_SUFFIX.upper() in conf.db.upper():
+                    kb.dumpTable = tbl
                 else:
                     kb.dumpTable = "%s.%s" % (conf.db, tbl)
 
                 if safeSQLIdentificatorNaming(conf.db) not in kb.data.cachedColumns or safeSQLIdentificatorNaming(tbl, True) not in kb.data.cachedColumns[safeSQLIdentificatorNaming(conf.db)] or not kb.data.cachedColumns[safeSQLIdentificatorNaming(conf.db)][safeSQLIdentificatorNaming(tbl, True)]:
                     warnMsg = "unable to enumerate the columns for table '%s'" % unsafeSQLIdentificatorNaming(tbl)
-                    if METADB_SUFFIX not in conf.db:
+                    if METADB_SUFFIX.upper() not in conf.db.upper():
                         warnMsg += " in database '%s'" % unsafeSQLIdentificatorNaming(conf.db)
                     warnMsg += ", skipping" if len(tblList) > 1 else ""
                     logger.warning(warnMsg)
@@ -154,7 +156,7 @@ class Entries(object):
 
                 if not colList:
                     warnMsg = "skipping table '%s'" % unsafeSQLIdentificatorNaming(tbl)
-                    if METADB_SUFFIX not in conf.db:
+                    if METADB_SUFFIX.upper() not in conf.db.upper():
                         warnMsg += " in database '%s'" % unsafeSQLIdentificatorNaming(conf.db)
                     warnMsg += " (no usable column names)"
                     logger.warning(warnMsg)
@@ -168,7 +170,7 @@ class Entries(object):
                 if conf.col:
                     infoMsg += " of column(s) '%s'" % colNames
                 infoMsg += " for table '%s'" % unsafeSQLIdentificatorNaming(tbl)
-                if METADB_SUFFIX not in conf.db:
+                if METADB_SUFFIX.upper() not in conf.db.upper():
                     infoMsg += " in database '%s'" % unsafeSQLIdentificatorNaming(conf.db)
                 logger.info(infoMsg)
 
@@ -239,7 +241,7 @@ class Entries(object):
                                     entries = BigArray(_zip(*[entries[colName] for colName in colList]))
                         else:
                             query = rootQuery.inband.query % (colString, conf.db, tbl)
-                    elif Backend.getIdentifiedDbms() in (DBMS.MYSQL, DBMS.PGSQL, DBMS.HSQLDB, DBMS.H2, DBMS.VERTICA, DBMS.PRESTO, DBMS.CRATEDB, DBMS.CACHE, DBMS.VIRTUOSO):
+                    elif Backend.getIdentifiedDbms() in (DBMS.MYSQL, DBMS.PGSQL, DBMS.HSQLDB, DBMS.H2, DBMS.VERTICA, DBMS.PRESTO, DBMS.CRATEDB, DBMS.CACHE, DBMS.VIRTUOSO, DBMS.CLICKHOUSE):
                         query = rootQuery.inband.query % (colString, conf.db, tbl, prioritySortColumns(colList)[0])
                     else:
                         query = rootQuery.inband.query % (colString, conf.db, tbl)
@@ -408,7 +410,7 @@ class Entries(object):
                                     if column not in entries:
                                         entries[column] = BigArray()
 
-                                    if Backend.getIdentifiedDbms() in (DBMS.MYSQL, DBMS.PGSQL, DBMS.HSQLDB, DBMS.H2, DBMS.VERTICA, DBMS.PRESTO, DBMS.CRATEDB, DBMS.CACHE):
+                                    if Backend.getIdentifiedDbms() in (DBMS.MYSQL, DBMS.PGSQL, DBMS.HSQLDB, DBMS.H2, DBMS.VERTICA, DBMS.PRESTO, DBMS.CRATEDB, DBMS.CACHE, DBMS.CLICKHOUSE):
                                         query = rootQuery.blind.query % (agent.preprocessField(tbl, column), conf.db, conf.tbl, sorted(colList, key=len)[0], index)
                                     elif Backend.getIdentifiedDbms() in (DBMS.ORACLE, DBMS.DB2, DBMS.DERBY, DBMS.ALTIBASE,):
                                         query = rootQuery.blind.query % (agent.preprocessField(tbl, column), tbl.upper() if not conf.db else ("%s.%s" % (conf.db.upper(), tbl.upper())), index)
@@ -457,12 +459,15 @@ class Entries(object):
                     kb.data.dumpedTable["__infos__"] = {"count": entriesCount,
                                                         "table": safeSQLIdentificatorNaming(tbl, True),
                                                         "db": safeSQLIdentificatorNaming(conf.db)}
-                    try:
-                        attackDumpedTable()
-                    except (IOError, OSError) as ex:
-                        errMsg = "an error occurred while attacking "
-                        errMsg += "table dump ('%s')" % getSafeExString(ex)
-                        logger.critical(errMsg)
+
+                    if not conf.disableHashing:
+                        try:
+                            attackDumpedTable()
+                        except (IOError, OSError) as ex:
+                            errMsg = "an error occurred while attacking "
+                            errMsg += "table dump ('%s')" % getSafeExString(ex)
+                            logger.critical(errMsg)
+
                     conf.dumper.dbTableValues(kb.data.dumpedTable)
 
             except SqlmapConnectionException as ex:
