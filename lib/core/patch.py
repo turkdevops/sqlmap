@@ -5,7 +5,6 @@ Copyright (c) 2006-2026 sqlmap developers (https://sqlmap.org)
 See the file 'LICENSE' for copying permission
 """
 
-import builtins
 import codecs
 import collections
 import difflib
@@ -178,6 +177,11 @@ def dirtyPatches():
 
         et.parse = _safe_parse
         et._patched = True
+
+    try:
+        import builtins
+    except ImportError:
+        import __builtin__ as builtins
 
     if "enumerate" in difflib.__dict__ and difflib.enumerate is not builtins.enumerate:
         difflib.enumerate = builtins.enumerate
