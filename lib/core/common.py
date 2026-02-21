@@ -1998,11 +1998,10 @@ def getLocalIP():
         debugMsg += "connection toward '%s'" % conf.hostname
         logger.debug(debugMsg)
     finally:
-        if s:
-            try:
-                s.close()
-            except:
-                pass
+        try:
+            s.close()
+        except socket.error:
+            pass
 
     return retVal
 
